@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GripVertical } from "lucide-react"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -21,20 +21,7 @@ export default function Home() {
     "04 Fri",
     "05 Sat",
     "06 Sun",
-  ]
-  
-  const handleDragEnd = (event: DragEndEvent) => {
-    const {active, over} = event;
-    
-    if (over && active.id !== over.id) {
-      setEvents((items) => {
-        const oldIndex = items.findIndex(item => item.id === active.id);
-        const newIndex = items.findIndex(item => item.id === over.id);
-        
-        return arrayMove(items, oldIndex, newIndex);
-      });
-    }
-  };
+  ];
 
   const [events, setEvents] = useState<ItemEvent[]>([
     {
@@ -148,30 +135,7 @@ export default function Home() {
             <h2 className="h-7 w-full bg-slate-300 rounded-sm flex items-center justify-center text-sm">
               Day trip to Rome
             </h2>
-            <DndContext 
-              sensors={useSensors(
-                useSensor(PointerSensor),
-                useSensor(KeyboardSensor, {
-                  coordinateGetter: sortableKeyboardCoordinates,
-                })
-              )}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext 
-                items={events.map(e => e.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <ol className="flex flex-col relative">
-                  {events.map((event) => (
-                    <SortableEventItem
-                      key={event.id}
-                      event={event}
-                    />
-                  ))}
-                </ol>
-              </SortableContext>
-            </DndContext>
+            <DragableEvents events={events} setEvents={setEvents} />
           </div >
         </div>
       </main >
@@ -180,6 +144,85 @@ export default function Home() {
 }
 
 
+// Client-side only draggable events component to avoid hydration issues
+function DragableEvents({ events, setEvents }: { 
+  events: ItemEvent[];
+  setEvents: React.Dispatch<React.SetStateAction<ItemEvent[]>>;
+}) {
+  const [mounted, setMounted] = useState(false);
+  
+  // Initialize sensors outside of conditionals to avoid hook rules warnings
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  // Handle drag end event
+  const handleDragEnd = (event: DragEndEvent) => {
+    const {active, over} = event;
+    
+    if (over && active.id !== over.id) {
+      setEvents((items) => {
+        const oldIndex = items.findIndex(item => item.id === active.id);
+        const newIndex = items.findIndex(item => item.id === over.id);
+        
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+  
+  // Component for non-interactive version before client-side hydration
+  const StaticEvents = () => (
+    <ol className="flex flex-col relative">
+      {events.map((event) => (
+        <li
+          key={event.id}
+          className="py-2"
+          style={{ height: 4 * 14 * event.duration }}
+        >
+          <div className="bg-slate-200 flex items-center justify-between pl-4 rounded-md h-full">
+            <span className="flex-1">{event.info}</span>
+            <span className="justify-between items-center flex-3 truncate">{event.desc}</span>
+            <span className="flex-0.5 flex justify-end mr-2 text-gray-500">
+              <GripVertical height={18} />
+            </span>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+  
+  // Component for interactive drag-and-drop
+  const DraggableEvents = () => (
+    <DndContext 
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext 
+        items={events.map(e => e.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <ol className="flex flex-col relative">
+          {events.map((event) => (
+            <SortableEventItem key={event.id} event={event} />
+          ))}
+        </ol>
+      </SortableContext>
+    </DndContext>
+  );
+  
+  // Conditionally render based on client-side hydration
+  return mounted ? <DraggableEvents /> : <StaticEvents />;
+}
+
+// Sortable item component
 function SortableEventItem({ event }: { event: ItemEvent }) {
   const {
     attributes,
