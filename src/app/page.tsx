@@ -1,9 +1,13 @@
 "use client"
 import { useState } from "react";
 import { GripVertical } from "lucide-react"
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type ItemEvent = {
   key: string;
+  id: string;
   info: string
   desc: string;
   duration: number;
@@ -18,52 +22,73 @@ export default function Home() {
     "05 Sat",
     "06 Sun",
   ]
+  
+  const handleDragEnd = (event: DragEndEvent) => {
+    const {active, over} = event;
+    
+    if (over && active.id !== over.id) {
+      setEvents((items) => {
+        const oldIndex = items.findIndex(item => item.id === active.id);
+        const newIndex = items.findIndex(item => item.id === over.id);
+        
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
 
   const [events, setEvents] = useState<ItemEvent[]>([
     {
       key: "flight",
+      id: "1",
       info: "🛫 HJZ789",
       desc: "Flight from 🇪🇸 BCN in Barcelona to 🇮🇹 FCO in Italy",
       duration: 3,
     },
     {
       key: "hostel",
+      id: "2",
       info: "🏨 Hostel",
       desc: "Check-in at Grand Youth hostel",
       duration: 1,
     },
     {
       key: "breakfast",
+      id: "3",
       info: "🍳 breakfast",
       desc: "Breakfast at Grand Youth hostel",
       duration: 1,
     },
     {
       key: "museum",
+      id: "4",
       info: "🏛️ museum",
       desc: "Visit the Vatican Museum",
       duration: 3,
     },
     {
       key: "lunch",
+      id: "5",
       info: "🍲 lunch",
       desc: "Lunch at The Superrfood restaurant",
       duration: 2,
     },
     {
       key: "siesta",
+      id: "6",
       info: "🛋️ siesta",
       desc: "Siesta back at the hostel",
       duration: 1.5,
     },
     {
       key: "walk",
+      id: "7",
       info: "🚶‍♂️ walk",
       desc: "Walk around the city center",
       duration: 2.5,
     },
     {
       key: "game",
+      id: "8",
       info: "🎮 game",
       desc: "Hostel boards game",
       duration: 3,
@@ -123,19 +148,30 @@ export default function Home() {
             <h2 className="h-7 w-full bg-slate-300 rounded-sm flex items-center justify-center text-sm">
               Day trip to Rome
             </h2>
-            <ol className="flex flex-col">
-              {events.map((event) => (
-                <li
-                  key={event.info}
-                  className="py-2"
-                  style={{
-                    height: 4 * 14 * event.duration
-                  }}
-                >
-                  {activityItem(event)}
-                </li>
-              ))}
-            </ol>
+            <DndContext 
+              sensors={useSensors(
+                useSensor(PointerSensor),
+                useSensor(KeyboardSensor, {
+                  coordinateGetter: sortableKeyboardCoordinates,
+                })
+              )}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext 
+                items={events.map(e => e.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <ol className="flex flex-col relative">
+                  {events.map((event) => (
+                    <SortableEventItem
+                      key={event.id}
+                      event={event}
+                    />
+                  ))}
+                </ol>
+              </SortableContext>
+            </DndContext>
           </div >
         </div>
       </main >
@@ -143,19 +179,51 @@ export default function Home() {
   );
 }
 
-const activityItem = (event: ItemEvent) => (
-  <div className="bg-slate-200 flex items-center justify-between pl-4 rounded-md h-full">
-    <span className="flex-1">
-      {event.info}
-    </span>
-    <span className="justify-between items-center flex-3 truncate">
-      {event.desc}
-    </span>
-    <span className="flex-0.5 flex justify-end mr-2 text-gray-500">
-      <GripVertical height={18} />
-    </span>
-  </div>
-)
+
+function SortableEventItem({ event }: { event: ItemEvent }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: event.id });
+  
+  const style = {
+    height: 4 * 14 * event.duration,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.8 : 1,
+    position: 'relative' as const,
+    boxShadow: isDragging ? '0 5px 10px rgba(0,0,0,0.2)' : 'none',
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="py-2"
+      {...attributes}
+    >
+      <div className="bg-slate-200 flex items-center justify-between pl-4 rounded-md h-full">
+        <span className="flex-1">
+          {event.info}
+        </span>
+        <span className="justify-between items-center flex-3 truncate">
+          {event.desc}
+        </span>
+        <span 
+          className="flex-0.5 flex justify-end mr-2 text-gray-500 cursor-grab active:cursor-grabbing" 
+          {...listeners}
+        >
+          <GripVertical height={18} />
+        </span>
+      </div>
+    </li>
+  );
+}
 
 function padWithZero(number: number) {
   if (number < 10) {
