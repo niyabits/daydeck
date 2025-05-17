@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Mukta } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const muktaSans = Mukta({
+  weight: ["400", "500", "600"],
+  variable: "--font-mukta-sans",
+  subsets: ["latin-ext"],
 });
 
 const geistMono = Geist_Mono({
@@ -25,9 +26,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${muktaSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <footer className="mt-12 mx-auto w-fit text-gray-500 text-sm p-8">
+          <a href="https://github.com/niyabits" target="_blank" rel="noreferrer" className="hover:text-gray-800 transition">
+            crafted by <span className="underline underline-offset-6">@niyabits</span>
+          </a>
+        </footer>
       </body>
     </html>
   );
